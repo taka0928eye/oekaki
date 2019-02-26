@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='UTF-8'>
+    <title>Handwriting</title>
+    <link rel='stylesheet' href='./node_modules/bootstrap/dist/css/bootstrap.min.css'>
+    <style>
+
+      body {
+        padding: 15px 0;
+        touch-action: none;
+      }
+
+      #canvas {
+        border: 5px solid #ddd;
+        margin-top:15px;
+      }
+
+      #button {
+        position: absolute;
+        right: 15px;
+        bottom: 15px;
+      }
+
+      .color-box {
+        width: 25px;
+        height: 25px;
+        border:1px solid #ccc;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id='app' class='container'>
+      <div class='row'>
+        <div class='col-12'>
+          <div id='direction'></div>
+          <div id='text'></div>
+          <canvas id='canvas' width='500' height='100'></canvas>
+        </div>
+      </div>
+      <button id='clear' class='btn' type='button'>消去</button>
+      <button id='save' class='btn' type='button'>決定</button>
+    </div>
+    <script>
+      require('./renderer.js')
+    </script>
+    <script>
+      var defColor = 'rgb(0, 0, 0)';
+      var defSize = 7
+
+      window.onload = function() {
+
+        var start = new Date();
+        var array = [];
+        var flg = false;
+        var input = require('fs');
+        var c = 1;
+
+        var questions = input.readFileSync('question/1-1.csv', 'utf8');
+        questions = questions.split(/\n/);
+
+        var question = questions[c].split(',');
+        var direction = document.getElementById('direction');
+        direction.innerHTML = question[1];
+        var text = document.getElementById('text');
+        text.innerHTML = '<br>' + question[2];
+
+
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+        canvas.addEventListener('pointerdown', function(e) {
+          e.preventDefault();
+          ctx.beginPath();
+          flg = true
+
+          var time = new Date();
+          var ms = time.getTime() - start.getTime();
+
+          var rect = e.target.getBoundingClientRect();
+          var x = e.clientX - rect.left;
+          var y = e.clientY - rect.top;
+          var z = e.pressure;
+
+          ctx.moveTo(x, y);
+
+          array.push([ms, x, y, z, 'down']);
+        });
+
+        canvas.addEventListener('pointerup', function(e) {
+          if(flg && e.pointerType === 'touch'){
+
+            flg = false
+            var time = new Date();
+            var ms = time.getTime() - start.getTime();
+            
+            var rect = e.target.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var y = e.clientY - rect.top;
+            var z = e.pressure;
+
+            ctx.lineTo(x, y);
+            ctx.lineCap = 'round';
+            ctx.lineWidth = defSize;
+            ctx.strokeStyle = defColor;
+            ctx.stroke();
+            array.push([ms, x, y, z, 'up']);
+          }
+        });
+
+        canvas.addEventListener('pointermove', function(e) {
+          if(flg && e.pointerType === 'touch'){
+
+            var time = new Date();
+            var ms = time.getTime() - start.getTime();
+            var rect = e.target.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var y = e.clientY - rect.top;
+            var z = e.pressure;
+
+
+            ctx.lineTo(x, y);
+            ctx.lineCap = 'round';
+            ctx.lineWidth = defSize;
+            ctx.strokeStyle = defColor;
+            ctx.stroke();
+            array.push([ms, x, y, z, 'move']);
+          }
+        });
+        
+        var save = document.getElementById('save');
+        save.addEventListener('click', function() {
+          var output = require('fs');
+          var formatCSV;
+          if (confirm('解答を決定しますか？')){
+            for (var i = 0; i < array.length; i++) {
+              var value = array[i];
+              for (var j = 0; j < value.length; j++) {
+                var innerValue = value[j]===null?'':value[j].toString(); var result = innerValue.replace(/"/g, '""'); if (result.search(/("|,|\n)/g) >= 0)
+                result = '"' + result + '"';
+                if (j > 0)
+                formatCSV += ',';
+                formatCSV += result;
+              }
+              formatCSV += '\n';
+            }
+            output.writeFile('log.csv', formatCSV, 'utf8', function(err) {
+              if (err) {
+                alert('保存できませんでした');
+              } else {
+                start = new Date();
+                array = []
+                flg = false;
+
+                if (c < 10) {
+                  c = c + 1;
+                  question = questions[c].split(',');
+                  direction.innerHTML = question[1];
+                  text.innerHTML = '<br>' + question[2];
+                  ctx.clearRect(0, 0, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+                } else {
+                  window.loadFile('result.html')
+                }
+              }
+            });
+          }
+        });
+
+        var clear = document.getElementById('clear');
+        clear.addEventListener('click', function() {
+          if(confirm('消去しますか？')){
+            flg = false;
+            ctx.clearRect(0, 0, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+          }
+        });
+      }
+  </script>
+  </body>
+</html>
